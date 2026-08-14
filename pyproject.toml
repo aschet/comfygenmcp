@@ -1,0 +1,131 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "comfygenmcp"
+description = "MCP server that runs image generation on ComfyUI and returns the image inline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Thomas Ascher", email = "thomas.ascher@gmx.at" }]
+keywords = ["mcp", "comfyui", "image-generation", "stable-diffusion", "llm"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    # 2.0 replaced FastMCP with MCPServer; server.py uses the 2.0 API.
+    "mcp>=2.0.0",
+    "httpx>=0.27",
+    "pillow>=10.0",
+    # Carries the official UI -> API workflow converter, so saved workflows can
+    # be named directly. GPL-3.0-only, same as this package.
+    "comfy-cli>=1.10",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/aschet/comfygenmcp"
+Repository = "https://github.com/aschet/comfygenmcp"
+Issues = "https://github.com/aschet/comfygenmcp/issues"
+
+[project.scripts]
+comfygenmcp = "comfygenmcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    # anyio ships the pytest11 plugin providing `anyio_mode`; no extra package.
+    "anyio>=4.0",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[tool.hatch.version]
+path = "src/comfygenmcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/comfygenmcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "A",    # flake8-builtins
+    "ARG",  # unused arguments
+    "B",    # flake8-bugbear
+    "C4",   # comprehensions
+    "D",    # pydocstyle
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "PT",   # flake8-pytest-style
+    "PTH",  # use pathlib
+    "RET",  # flake8-return
+    "RUF",  # ruff-specific
+    "SIM",  # flake8-simplify
+    "TID",  # tidy imports
+    "UP",   # pyupgrade
+    "W",    # pycodestyle warnings
+]
+ignore = [
+    "D105", # magic methods are self-explanatory here
+    "D107", # __init__ docstring; the class docstring covers it
+    "D203", # incompatible with D211
+    "D213", # incompatible with D212
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ARG001", # fixtures and stubs legitimately ignore arguments
+    "ARG002",
+    "D100",   # test modules do not need docstrings on every item
+    "D103",
+    "D104",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+# comfy-cli ships no type information.
+module = ["comfy_cli.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+anyio_mode = "auto"
