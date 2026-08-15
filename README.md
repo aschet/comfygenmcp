@@ -105,8 +105,8 @@ Three tools are exposed:
 - Node detection can pick the wrong node when a workflow has several prompt
   boxes. `comfy_status` shows what it found; set a node's Title to
   `MCP:prompt` to override.
-- Images are sent as JPEG, downscaled and compressed to fit a 1 MB limit, with
-  transparency flattened onto white. The full-resolution original stays in
+- Images are sent as WebP, downscaled and compressed to fit a 1 MB limit,
+  with transparency preserved. The full-resolution original stays in
   ComfyUI's output folder.
 
 ## Configuration

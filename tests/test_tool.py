@@ -58,7 +58,7 @@ async def test_returns_text_then_image(wired):
 
     image = blocks[1]
     assert isinstance(image, types.ImageContent)
-    assert image.mime_type == "image/jpeg"
+    assert image.mime_type == "image/webp"
     decoded = Image.open(io.BytesIO(base64.b64decode(image.data)))
     assert decoded.size == (128, 96)
 

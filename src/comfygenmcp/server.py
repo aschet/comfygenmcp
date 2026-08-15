@@ -110,25 +110,22 @@ def _fit(image: Image.Image, long_edge: int) -> Image.Image:
     )
 
 
-def _as_rgb(image: Image.Image) -> Image.Image:
-    """Drop to RGB, compositing any transparency onto white.
+def _prepare(image: Image.Image) -> Image.Image:
+    """Convert to a mode WebP can save, preserving any alpha channel.
 
-    JPEG has no alpha channel; without this, a cutout workflow's transparent
-    background would come back solid black.
+    Unlike JPEG, WebP has an RGBA mode, so a cutout workflow's transparency
+    survives untouched rather than being flattened onto an assumed background.
     """
-    if image.mode == "RGB":
+    if image.mode in ("RGB", "RGBA"):
         return image
-    if image.mode in ("RGBA", "LA", "P", "PA"):
-        rgba = image.convert("RGBA")
-        flattened = Image.new("RGB", rgba.size, (255, 255, 255))
-        flattened.paste(rgba, mask=rgba.getchannel("A"))
-        return flattened
+    if image.mode in ("LA", "PA") or "transparency" in image.info:
+        return image.convert("RGBA")
     return image.convert("RGB")
 
 
-def _jpeg(image: Image.Image, quality: int) -> io.BytesIO:
+def _webp(image: Image.Image, quality: int) -> io.BytesIO:
     buffer = io.BytesIO()
-    image.save(buffer, format="JPEG", quality=quality, optimize=True)
+    image.save(buffer, format="WEBP", quality=quality, method=6)
     return buffer
 
 
@@ -145,20 +142,20 @@ def _encode(data: bytes) -> tuple[str, str, tuple[int, int]]:
     original = opened.size
 
     image = opened if max(opened.size) <= MAX_IMAGE_EDGE else _fit(opened, MAX_IMAGE_EDGE)
-    image = _as_rgb(image)
+    image = _prepare(image)
 
     for quality in (88, 75, 60):
-        buffer = _jpeg(image, quality)
+        buffer = _webp(image, quality)
         if buffer.tell() <= MAX_IMAGE_BYTES:
-            return base64.b64encode(buffer.getvalue()).decode(), "image/jpeg", original
+            return base64.b64encode(buffer.getvalue()).decode(), "image/webp", original
 
     # Quality alone was not enough -- give up pixels instead.
     for _ in range(6):
         image = _fit(image, max(64, int(max(image.size) * 0.75)))
-        buffer = _jpeg(image, 75)
+        buffer = _webp(image, 75)
         if buffer.tell() <= MAX_IMAGE_BYTES:
             break
-    return base64.b64encode(buffer.getvalue()).decode(), "image/jpeg", original
+    return base64.b64encode(buffer.getvalue()).decode(), "image/webp", original
 
 
 # structured_output=False keeps the return value as raw content blocks, so the

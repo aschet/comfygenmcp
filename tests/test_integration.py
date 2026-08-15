@@ -102,15 +102,15 @@ def test_encode_fits_the_payload_budget_and_stays_decodable():
 
     payload, mime, original = server._encode(buffer.getvalue())
     assert original == (4000, 2000)
-    assert mime == "image/jpeg"
+    assert mime == "image/webp"
     assert len(payload) < 1_000_000, "must fit the client's 1 MB image limit"
 
     decoded = Image.open(io.BytesIO(base64.b64decode(payload)))
     assert max(decoded.size) <= server.MAX_IMAGE_EDGE
 
 
-def test_transparency_is_flattened_onto_white_not_black():
-    """JPEG has no alpha; a cutout must not come back as a black box."""
+def test_transparency_survives_encoding():
+    """WebP has an alpha channel, so a cutout's transparency is not flattened."""
     from comfygenmcp import server
 
     im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -119,8 +119,14 @@ def test_transparency_is_flattened_onto_white_not_black():
     im.save(buffer, format="PNG")
 
     payload, _, _ = server._encode(buffer.getvalue())
-    decoded = Image.open(io.BytesIO(base64.b64decode(payload))).convert("RGB")
-    assert decoded.getpixel((2, 2)) == (255, 255, 255)
+    decoded = Image.open(io.BytesIO(base64.b64decode(payload))).convert("RGBA")
+    assert decoded.getpixel((2, 2))[3] == 0, "corner was transparent"
+
+    r, g, b, a = decoded.getpixel((32, 32))
+    assert a == 255, "center was opaque"
+    # Lossy compression rounds slightly; a black background would round to
+    # near-zero, not near the original red.
+    assert (r, g, b) == pytest.approx((200, 30, 30), abs=5)
 
 
 def test_view_url_omits_default_parameters():
