@@ -10,6 +10,8 @@ inject into.
 
 Requires Python 3.10+ and a running ComfyUI.
 
+Linux and macOS:
+
 ```bash
 git clone https://github.com/aschet/comfygenmcp.git
 cd comfygenmcp
@@ -17,8 +19,18 @@ python -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-That gives you the command `.venv/bin/comfygenmcp`, which a client launches for
-you — nothing to start by hand beyond ComfyUI itself.
+Windows:
+
+```bat
+git clone https://github.com/aschet/comfygenmcp.git
+cd comfygenmcp
+python -m venv .venv
+.venv\Scripts\pip install -e .
+```
+
+That gives you the command `.venv/bin/comfygenmcp` (`.venv\Scripts\comfygenmcp.exe`
+on Windows), which a client launches for you — nothing to start by hand beyond
+ComfyUI itself.
 
 ## Connecting a Client
 
@@ -42,6 +54,8 @@ workflows are slow or an agent chains several generations.
   }
 }
 ```
+
+On Windows, `command` is the `.venv\Scripts\comfygenmcp.exe` path instead.
 
 - Claude Desktop: add it to `claude_desktop_config.json`. The image only
   shows inside the collapsed tool card — expand it, or use the URL instead.
