@@ -51,8 +51,7 @@ def wired(tmp_path, monkeypatch):
 
 @pytest.mark.anyio
 async def test_returns_text_then_image(wired):
-    result = await server.generate_image(prompt="a fox", seed=1234, workflow=wired["workflow"])
-    blocks = result.content
+    blocks = await server.generate_image(prompt="a fox", seed=1234, workflow=wired["workflow"])
 
     assert [type(b) for b in blocks] == [types.TextContent, types.ImageContent]
     assert (
@@ -64,18 +63,6 @@ async def test_returns_text_then_image(wired):
     assert image.mime_type == "image/webp"
     decoded = Image.open(io.BytesIO(base64.b64decode(image.data)))
     assert decoded.size == (128, 96)
-
-
-@pytest.mark.anyio
-async def test_structured_content_carries_workflow_seed_and_url(wired):
-    """The seed and URL live here now, not in a text block."""
-    result = await server.generate_image(prompt="a fox", seed=1234, workflow=wired["workflow"])
-
-    assert result.structured_content == {
-        "workflow": wired["workflow"],
-        "seed": 1234,
-        "images": [{"url": "http://comfy.test/view?filename=out.png"}],
-    }
 
 
 @pytest.mark.anyio
@@ -94,8 +81,8 @@ async def test_omitted_seed_is_random_and_reported(wired):
     seed_b = wired["graph"]["3"]["inputs"]["seed"]
 
     assert seed_a != seed_b, "omitting the seed must not repeat the same image"
-    assert first.structured_content["seed"] == seed_a
-    assert second.structured_content["seed"] == seed_b
+    assert f"seed {seed_a}" in first[0].text
+    assert f"seed {seed_b}" in second[0].text
     assert 0 <= seed_a <= server.MAX_SEED
 
 
@@ -112,18 +99,14 @@ async def test_fetch_image_false_returns_only_the_text(wired):
     Some clients hand the base64 to the model as text, which no small context
     window survives.
     """
-    result = await server.generate_image(
+    blocks = await server.generate_image(
         prompt="x", seed=5, workflow=wired["workflow"], fetch_image=False
     )
-    blocks = result.content
 
     assert [type(b) for b in blocks] == [types.TextContent]
     assert (
         blocks[0].text == f"{wired['workflow']} · seed 5 · http://comfy.test/view?filename=out.png"
     )
-    assert result.structured_content["images"] == [
-        {"url": "http://comfy.test/view?filename=out.png"}
-    ]
 
 
 @pytest.mark.anyio
@@ -135,13 +118,12 @@ async def test_no_filename_and_no_image_still_reports_the_seed(wired, monkeypatc
 
     monkeypatch.setattr(server.ComfyClient, "generate", generate)
 
-    result = await server.generate_image(
+    blocks = await server.generate_image(
         prompt="x", seed=5, workflow=wired["workflow"], fetch_image=False
     )
 
-    assert [type(b) for b in result.content] == [types.TextContent]
-    assert result.content[0].text == "seed 5"
-    assert result.structured_content["images"] == []
+    assert [type(b) for b in blocks] == [types.TextContent]
+    assert blocks[0].text == "seed 5"
 
 
 @pytest.mark.anyio

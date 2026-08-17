@@ -173,10 +173,8 @@ def _int_type_not_anyof(schema: dict[str, Any]) -> None:
     schema["type"] = "integer"
 
 
-# structured_output=False stops the SDK from auto-deriving an outputSchema and
-# serialising our whole return value -- including the image -- into JSON. We
-# build the CallToolResult ourselves instead, so content stays raw blocks
-# while structured_content still carries a real map alongside it.
+# structured_output=False stops the SDK from serialising our return value --
+# including the image -- into JSON instead of real content blocks.
 @mcp.tool(structured_output=False)
 async def generate_image(
     prompt: Annotated[
@@ -210,12 +208,11 @@ async def generate_image(
             )
         ),
     ] = True,
-) -> types.CallToolResult:
+) -> list[types.TextContent | types.ImageContent]:
     """Generate an image on ComfyUI and return it inline.
 
     Returns "<workflow> · seed <seed> · <url>" plus -- unless fetch_image is
-    false -- the image itself. The same facts are also in structured_content,
-    for a client that parses rather than reads.
+    false -- the image itself.
 
     Clients usually collapse tool results, so the image is easy to miss. Pass
     the URL on in your reply: it survives the collapse, and is how the user
@@ -242,25 +239,18 @@ async def generate_image(
             "SaveImage or PreviewImage node."
         )
 
-    blocks: list[types.ContentBlock] = []
-    images: list[dict[str, Any]] = []
+    blocks: list[types.TextContent | types.ImageContent] = []
     notes: list[str] = []
 
     for ref in refs:
-        image: dict[str, Any] = {}
         if ref.filename:
             url = client.view_url(ref)
-            image["url"] = url
             notes.append(f"{workflow} · seed {used_seed} · {url}")
         if not fetch_image:
-            if image:
-                images.append(image)
             continue
 
         raw = await client.fetch(ref)
-        payload, mime, original = _encode(raw)
-        if max(original) > MAX_IMAGE_EDGE:
-            image["downscaled_from"] = f"{original[0]}x{original[1]}"
+        payload, mime, _ = _encode(raw)
         blocks.append(
             types.ImageContent(
                 type="image",
@@ -272,21 +262,16 @@ async def generate_image(
                 annotations=types.Annotations(audience=["user", "assistant"], priority=1.0),
             )
         )
-        if image:
-            images.append(image)
 
     if notes:
         blocks.insert(0, types.TextContent(type="text", text="\n".join(notes)))
     elif not blocks:
         # No ref carried a filename to build a URL from, and fetch_image is
-        # false -- content would otherwise be empty, indistinguishable from
-        # a silent failure to a client that never looks at structured_content.
+        # false -- content would otherwise be empty, indistinguishable from a
+        # silent failure.
         blocks.append(types.TextContent(type="text", text=f"seed {used_seed}"))
 
-    return types.CallToolResult(
-        content=blocks,
-        structured_content={"workflow": workflow, "seed": used_seed, "images": images},
-    )
+    return blocks
 
 
 def main() -> None:
