@@ -91,19 +91,6 @@ async def test_missing_workflow_file_explains_itself(tmp_path):
 
 
 @pytest.mark.anyio
-async def test_status_reports_detected_nodes(wired, monkeypatch):
-    async def fake_resolve(spec, client):
-        return server.sources.Resolved(KREA_GRAPH, "saved:test.json")
-
-    monkeypatch.setattr(server.sources, "resolve", fake_resolve)
-
-    report = json.loads(await server.comfy_status(workflow="test"))
-    assert report["workflow_resolved_from"] == "saved:test.json"
-    assert report["workflow"]["prompt_node"]["node"] == "6"
-    assert report["workflow"]["seed_inputs"] == ["3.seed"]
-
-
-@pytest.mark.anyio
 async def test_fetch_image_false_returns_only_text(wired):
     """The URL has to carry the result when the image is not returned.
 

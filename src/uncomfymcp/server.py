@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import base64
 import io
-import json
 import logging
 import random
 from dataclasses import dataclass
@@ -64,7 +63,7 @@ mcp = MCPServer(
         "workflows to compare -- each call ties up the user's GPU for many "
         "seconds, and they asked for one image.\n\n"
         "Always tell the user the seed a result came back with, so they can "
-        "reproduce it. Use comfy_status to diagnose failures."
+        "reproduce it."
     ),
 )
 
@@ -158,6 +157,19 @@ def _encode(data: bytes) -> tuple[str, str, tuple[int, int]]:
     return base64.b64encode(buffer.getvalue()).decode(), "image/webp", original
 
 
+def _int_type_not_anyof(schema: dict[str, Any]) -> None:
+    """Flatten `int | None` to a plain integer type in the exposed schema.
+
+    Some MCP clients (AnythingLLM among them) show no type at all for a field
+    schema'd as `anyOf: [integer, null]`, but render a plain `type: integer`
+    fine. Omitting `seed` from `required` already tells a client it need not
+    pass one; the schema does not also need to spell out that null would be
+    accepted.
+    """
+    schema.pop("anyOf", None)
+    schema["type"] = "integer"
+
+
 # structured_output=False keeps the return value as raw content blocks, so the
 # image reaches the client as an image rather than serialised JSON.
 @mcp.tool(structured_output=False)
@@ -179,7 +191,8 @@ async def generate_image(
     seed: Annotated[
         int | None,
         Field(
-            description="Reuse a seed from an earlier result to reproduce it. Omit for a new one."
+            description="Reuse a seed from an earlier result to reproduce it. Omit for a new one.",
+            json_schema_extra=_int_type_not_anyof,
         ),
     ] = None,
     fetch_image: Annotated[
@@ -254,48 +267,6 @@ async def generate_image(
 
     blocks.insert(0, types.TextContent(type="text", text=" · ".join(notes)))
     return blocks
-
-
-@mcp.tool(structured_output=False)
-async def comfy_status(
-    workflow: Annotated[
-        str | None,
-        Field(description="Also check this workflow, naming the nodes it would patch."),
-    ] = None,
-) -> str:
-    """Check the ComfyUI connection, and optionally inspect one workflow.
-
-    Reports whether ComfyUI is reachable and what hardware it has. Given a
-    workflow name, also reports which nodes would receive the prompt and seed --
-    use that to diagnose a generation that failed or patched the wrong node.
-    """
-    report: dict[str, Any] = {"comfy_url": settings.comfy_url}
-
-    client = ComfyClient(settings.comfy_url, timeout=30.0)
-    try:
-        stats = await client.stats()
-        system = stats.get("system", {})
-        report["comfyui"] = {
-            "reachable": True,
-            "version": system.get("comfyui_version"),
-            "python": system.get("python_version", "").split()[0] or None,
-        }
-        report["devices"] = [
-            {"name": d.get("name"), "vram_free_gb": round(d.get("vram_free", 0) / 2**30, 1)}
-            for d in stats.get("devices", [])
-        ]
-    except Exception as exc:
-        report["comfyui"] = {"reachable": False, "error": str(exc)}
-
-    if workflow is not None:
-        try:
-            found = await sources.resolve(workflow, client)
-            report["workflow_resolved_from"] = found.source
-            report["workflow"] = wf.describe(found.graph)
-        except Exception as exc:
-            report["workflow"] = {"error": str(exc)}
-
-    return json.dumps(report, indent=2)
 
 
 def main() -> None:

@@ -90,21 +90,19 @@ claude: [image]  Done: generated with Krea2 · seed 12345 ·
         http://127.0.0.1:8188/view?filename=Krea2_turbo_00007_.png
 ```
 
-Three tools are exposed:
+Two tools are exposed:
 
 | Tool | Description |
 | --- | --- |
 | `generate_image(prompt, workflow, seed?, fetch_image?)` | Generate and return the image. Seeds are random unless you pass one, and every result reports the seed it used. `fetch_image` defaults to true; a client that cannot render one can pass false and get only the seed and URL. |
 | `list_workflows()` | The workflows saved in ComfyUI, split into those ready to run and those that cannot. |
-| `comfy_status(workflow?)` | Connection check; with a name, the nodes it would patch. |
 
 ## Limitations
 
 - Only the prompt and seed change — no width, height, steps or sampler; those
   come from the workflow. A sampler set to "fixed" in ComfyUI is not honoured.
 - Node detection can pick the wrong node when a workflow has several prompt
-  boxes. `comfy_status` shows what it found; set a node's Title to
-  `MCP:prompt` to override.
+  boxes; set a node's Title to `MCP:prompt` to override.
 - Images are sent as WebP, downscaled and compressed to fit a 1 MB limit,
   with transparency preserved. The full-resolution original stays in
   ComfyUI's output folder.

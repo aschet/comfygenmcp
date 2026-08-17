@@ -193,7 +193,7 @@ def find_output_nodes(graph: Graph) -> list[str]:
 
 
 def describe(graph: Graph) -> dict[str, Any]:
-    """Summarise what the patcher found, for the `comfy_status` tool to report."""
+    """Summarise what the patcher found: prompt node, seed inputs, outputs."""
     prompt_id = find_prompt_node(graph)
 
     def label(node_id: str | None) -> Any:

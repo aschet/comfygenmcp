@@ -39,13 +39,25 @@ class ComfyClient:
     async def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(base_url=self.base_url, timeout=30.0)
 
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        """Issue one request, turning a dead connection into a clear error.
+
+        Only connection-level failures are caught here -- a wrong host, a
+        closed port, ComfyUI not running. An HTTP error status means it *did*
+        answer, so that stays the caller's problem via `raise_for_status()`.
+        """
+        try:
+            async with await self._client() as http:
+                return await http.request(method, path, **kwargs)
+        except httpx.RequestError as exc:
+            raise ComfyError(f"Could not reach ComfyUI at {self.base_url}: {exc}") from exc
+
     async def stats(self) -> dict[str, Any]:
         """Return ComfyUI's `/system_stats`: version, python, devices, VRAM."""
-        async with await self._client() as http:
-            resp = await http.get("/system_stats")
-            resp.raise_for_status()
-            stats: dict[str, Any] = resp.json()
-            return stats
+        resp = await self._request("GET", "/system_stats")
+        resp.raise_for_status()
+        stats: dict[str, Any] = resp.json()
+        return stats
 
     async def queue(self, graph: dict[str, Any], ui_workflow: Any = None) -> str:
         """Submit a graph, returning the prompt id.
@@ -57,39 +69,37 @@ class ComfyClient:
         body: dict[str, Any] = {"prompt": graph, "client_id": self.client_id}
         if ui_workflow is not None:
             body["extra_data"] = {"extra_pnginfo": {"workflow": ui_workflow}}
-        async with await self._client() as http:
-            resp = await http.post("/prompt", json=body)
-            if resp.status_code >= 400:
-                raise ComfyError(_format_queue_error(resp))
-            accepted: dict[str, Any] = resp.json()
-            return str(accepted["prompt_id"])
+        resp = await self._request("POST", "/prompt", json=body)
+        if resp.status_code >= 400:
+            raise ComfyError(_format_queue_error(resp))
+        accepted: dict[str, Any] = resp.json()
+        return str(accepted["prompt_id"])
 
     async def wait(self, prompt_id: str, poll: float = 0.7) -> dict[str, Any]:
         """Poll /history until the prompt finishes; return its history entry."""
         deadline = asyncio.get_event_loop().time() + self.timeout
-        async with await self._client() as http:
-            while True:
-                resp = await http.get(f"/history/{prompt_id}")
-                resp.raise_for_status()
-                history: dict[str, dict[str, Any]] = resp.json()
-                entry = history.get(prompt_id)
-                if entry is not None:
-                    status = entry.get("status", {})
-                    # 'completed' is absent on older builds; outputs implies done.
-                    if status.get("completed") or entry.get("outputs"):
-                        if status.get("status_str") == "error":
-                            raise ComfyError(_format_exec_error(status))
-                        return entry
+        while True:
+            resp = await self._request("GET", f"/history/{prompt_id}")
+            resp.raise_for_status()
+            history: dict[str, dict[str, Any]] = resp.json()
+            entry = history.get(prompt_id)
+            if entry is not None:
+                status = entry.get("status", {})
+                # 'completed' is absent on older builds; outputs implies done.
+                if status.get("completed") or entry.get("outputs"):
                     if status.get("status_str") == "error":
                         raise ComfyError(_format_exec_error(status))
+                    return entry
+                if status.get("status_str") == "error":
+                    raise ComfyError(_format_exec_error(status))
 
-                if asyncio.get_event_loop().time() > deadline:
-                    await self.interrupt()
-                    raise ComfyError(
-                        f"Generation timed out after {self.timeout:.0f}s. Raise "
-                        "--timeout if your workflow is genuinely this slow."
-                    )
-                await asyncio.sleep(poll)
+            if asyncio.get_event_loop().time() > deadline:
+                await self.interrupt()
+                raise ComfyError(
+                    f"Generation timed out after {self.timeout:.0f}s. Raise "
+                    "--timeout if your workflow is genuinely this slow."
+                )
+            await asyncio.sleep(poll)
 
     async def interrupt(self) -> None:
         """Ask ComfyUI to abort the running prompt. Best effort; never raises."""
@@ -116,17 +126,13 @@ class ComfyClient:
 
     async def fetch(self, ref: ImageRef) -> bytes:
         """Download one generated image."""
-        async with await self._client() as http:
-            resp = await http.get(
-                "/view",
-                params={
-                    "filename": ref.filename,
-                    "subfolder": ref.subfolder,
-                    "type": ref.type,
-                },
-            )
-            resp.raise_for_status()
-            return resp.content
+        resp = await self._request(
+            "GET",
+            "/view",
+            params={"filename": ref.filename, "subfolder": ref.subfolder, "type": ref.type},
+        )
+        resp.raise_for_status()
+        return resp.content
 
     async def generate(self, graph: dict[str, Any], ui_workflow: Any = None) -> list[ImageRef]:
         """Queue a graph, wait for it, and return references to its images."""
