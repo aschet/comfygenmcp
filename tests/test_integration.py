@@ -17,7 +17,7 @@ import httpx
 import pytest
 from PIL import Image
 
-from comfygenmcp.comfy import ComfyClient, ComfyError
+from uncomfymcp.comfy import ComfyClient, ComfyError
 
 COMFY_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188")
 
@@ -72,8 +72,8 @@ def test_bad_graph_raises_a_useful_error():
 @pytest.mark.anyio
 async def test_saved_workflows_are_listable_and_convertible():
     """The durable path: fetch a UI workflow off the server and convert it."""
-    from comfygenmcp import sources
-    from comfygenmcp import workflow as wf
+    from uncomfymcp import sources
+    from uncomfymcp import workflow as wf
 
     client = ComfyClient(COMFY_URL, timeout=120)
     names = await sources.list_saved(client)
@@ -94,7 +94,7 @@ async def test_saved_workflows_are_listable_and_convertible():
 
 
 def test_encode_fits_the_payload_budget_and_stays_decodable():
-    from comfygenmcp import server
+    from uncomfymcp import server
 
     big = Image.new("RGB", (4000, 2000), (10, 200, 30))
     buffer = io.BytesIO()
@@ -111,7 +111,7 @@ def test_encode_fits_the_payload_budget_and_stays_decodable():
 
 def test_transparency_survives_encoding():
     """WebP has an alpha channel, so a cutout's transparency is not flattened."""
-    from comfygenmcp import server
+    from uncomfymcp import server
 
     im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     im.paste((200, 30, 30, 255), (20, 20, 44, 44))
@@ -131,7 +131,7 @@ def test_transparency_survives_encoding():
 
 def test_view_url_omits_default_parameters():
     """Ampersands are what barebones renderers mangle; skip needless ones."""
-    from comfygenmcp.comfy import ComfyClient, ImageRef
+    from uncomfymcp.comfy import ComfyClient, ImageRef
 
     client = ComfyClient("http://127.0.0.1:8188")
     plain = client.view_url(ImageRef("out.png", "", "output"))

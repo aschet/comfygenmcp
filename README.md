@@ -1,4 +1,4 @@
-# comfygenmcp
+# uncomfymcp
 
 A Model Context Protocol (MCP) server that connects an AI assistant to a running
 ComfyUI instance. It fetches a workflow saved in ComfyUI, writes the prompt and
@@ -13,8 +13,8 @@ Requires Python 3.10+ and a running ComfyUI.
 Linux and macOS:
 
 ```bash
-git clone https://github.com/aschet/comfygenmcp.git
-cd comfygenmcp
+git clone https://github.com/aschet/uncomfymcp.git
+cd uncomfymcp
 python -m venv .venv
 .venv/bin/pip install -e .
 ```
@@ -22,20 +22,20 @@ python -m venv .venv
 Windows:
 
 ```bat
-git clone https://github.com/aschet/comfygenmcp.git
-cd comfygenmcp
+git clone https://github.com/aschet/uncomfymcp.git
+cd uncomfymcp
 python -m venv .venv
 .venv\Scripts\pip install -e .
 ```
 
-That gives you the command `.venv/bin/comfygenmcp` (`.venv\Scripts\comfygenmcp.exe`
+That gives you the command `.venv/bin/uncomfymcp` (`.venv\Scripts\uncomfymcp.exe`
 on Windows), which a client launches for you — nothing to start by hand beyond
 ComfyUI itself.
 
 ## Connecting a Client
 
 Any MCP client works. By default the server speaks stdio, meaning the client
-launches `.venv/bin/comfygenmcp` itself and talks to it over the process
+launches `.venv/bin/uncomfymcp` itself and talks to it over the process
 pipes. With `--transport http` it instead listens on
 `http://127.0.0.1:8000/mcp` for clients that connect over the network — with
 no authentication, so don't expose it without one in front.
@@ -48,14 +48,14 @@ workflows are slow or an agent chains several generations.
 ```json
 {
   "mcpServers": {
-    "comfygen": {
-      "command": "/path/to/comfygenmcp/.venv/bin/comfygenmcp"
+    "uncomfy": {
+      "command": "/path/to/uncomfymcp/.venv/bin/uncomfymcp"
     }
   }
 }
 ```
 
-On Windows, `command` is the `.venv\Scripts\comfygenmcp.exe` path instead.
+On Windows, `command` is the `.venv\Scripts\uncomfymcp.exe` path instead.
 
 - Claude Desktop: add it to `claude_desktop_config.json`. The image only
   shows inside the collapsed tool card — expand it, or use the URL instead.

@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from comfygenmcp import workflow as wf
+from uncomfymcp import workflow as wf
 
 # Classic SD: sampler -> two CLIPTextEncode, seed on the KSampler.
 SD_GRAPH = {

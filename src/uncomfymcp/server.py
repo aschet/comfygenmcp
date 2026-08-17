@@ -47,7 +47,7 @@ class Settings:
 
 settings = Settings()
 mcp = MCPServer(
-    "comfygen",
+    "uncomfy",
     version=__version__,
     instructions=(
         "Generates images by running a workflow on a ComfyUI server.\n\n"
@@ -299,8 +299,8 @@ async def comfy_status(
 
 
 def main() -> None:
-    """Run the MCP server. Entry point for the `comfygenmcp` command."""
-    parser = argparse.ArgumentParser(prog="comfygenmcp", description=__doc__)
+    """Run the MCP server. Entry point for the `uncomfymcp` command."""
+    parser = argparse.ArgumentParser(prog="uncomfymcp", description=__doc__)
     parser.add_argument(
         "--transport",
         choices=["stdio", "http"],

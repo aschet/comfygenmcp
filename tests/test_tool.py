@@ -12,8 +12,8 @@ import mcp.types as types
 import pytest
 from PIL import Image
 
-from comfygenmcp import server
-from comfygenmcp.comfy import ImageRef
+from uncomfymcp import server
+from uncomfymcp.comfy import ImageRef
 
 from .test_workflow import KREA_GRAPH
 

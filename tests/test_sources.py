@@ -10,8 +10,8 @@ import pytest
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
-from comfygenmcp import sources
-from comfygenmcp.comfy import ComfyClient
+from uncomfymcp import sources
+from uncomfymcp.comfy import ComfyClient
 
 from .test_workflow import KREA_GRAPH
 
