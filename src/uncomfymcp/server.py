@@ -54,8 +54,11 @@ mcp = MCPServer(
         "This server reuses it, substituting only the prompt and seed -- "
         "everything else is whatever that workflow defines and cannot be "
         "changed here.\n\n"
-        "When the user asks for an image, produce one rather than asking them to "
-        "fill in details: pass their description as the prompt, and use the "
+        "Any request describing a picture counts as asking for an image, however "
+        "it's phrased -- a scene, a portrait, an art style or visual effect, not "
+        'only a literal "generate/draw/make me an image". Produce one rather '
+        "than asking them to fill in details or treating it as a stylistic "
+        "description: pass their description as the prompt, and use the "
         "workflow they named. Call list_workflows only when they named none or "
         "the name was not found, then pick one ready workflow. Ask only when "
         "they have named no subject at all.\n\n"
@@ -170,8 +173,10 @@ def _int_type_not_anyof(schema: dict[str, Any]) -> None:
     schema["type"] = "integer"
 
 
-# structured_output=False keeps the return value as raw content blocks, so the
-# image reaches the client as an image rather than serialised JSON.
+# structured_output=False stops the SDK from auto-deriving an outputSchema and
+# serialising our whole return value -- including the image -- into JSON. We
+# build the CallToolResult ourselves instead, so content stays raw blocks
+# while structured_content still carries a real map alongside it.
 @mcp.tool(structured_output=False)
 async def generate_image(
     prompt: Annotated[
@@ -205,20 +210,20 @@ async def generate_image(
             )
         ),
     ] = True,
-) -> list[types.TextContent | types.ImageContent]:
+) -> types.CallToolResult:
     """Generate an image on ComfyUI and return it inline.
 
-    Returns the seed used and a URL to the full-resolution original on
-    ComfyUI, and -- unless fetch_image is false -- the image itself.
-
-    Use exactly the workflow name the user asked for. Similar names are
-    different workflows -- "Krea2" and "Krea2_App.app" are not interchangeable.
+    Returns "<workflow> · seed <seed> · <url>" plus -- unless fetch_image is
+    false -- the image itself. The same facts are also in structured_content,
+    for a client that parses rather than reads.
 
     Clients usually collapse tool results, so the image is easy to miss. Pass
-    the seed and the URL on in your reply: they survive the collapse, and the
-    URL is how the user sees the picture when no image is returned. Write the
-    URL bare so the client turns it into a link -- code formatting or
-    backticks around it make it unclickable.
+    the URL on in your reply: it survives the collapse, and is how the user
+    sees the picture when no image is returned. Write it bare so the client
+    turns it into a link -- code formatting or backticks make it unclickable.
+
+    Use exactly the workflow name the user asked for. Similar names are
+    different workflows -- "Krea2" and "Krea2+Upscale" are not interchangeable.
 
     Fails if the workflow needs an input image or has no prompt node to patch.
     """
@@ -237,22 +242,25 @@ async def generate_image(
             "SaveImage or PreviewImage node."
         )
 
-    blocks: list[types.TextContent | types.ImageContent] = []
-    # Lead with a plain statement that this finished, and name the workflow it
-    # used: without that, a model can read a bare metadata line as an
-    # unsatisfying result and try the remaining workflows in turn.
-    notes = [f"Done: generated with {workflow}", f"seed {used_seed}"]
+    blocks: list[types.ContentBlock] = []
+    images: list[dict[str, Any]] = []
+    notes: list[str] = []
 
     for ref in refs:
+        image: dict[str, Any] = {}
         if ref.filename:
-            notes.append(client.view_url(ref))
+            url = client.view_url(ref)
+            image["url"] = url
+            notes.append(f"{workflow} · seed {used_seed} · {url}")
         if not fetch_image:
+            if image:
+                images.append(image)
             continue
 
         raw = await client.fetch(ref)
         payload, mime, original = _encode(raw)
         if max(original) > MAX_IMAGE_EDGE:
-            notes.append(f"downscaled from {original[0]}x{original[1]}")
+            image["downscaled_from"] = f"{original[0]}x{original[1]}"
         blocks.append(
             types.ImageContent(
                 type="image",
@@ -264,9 +272,21 @@ async def generate_image(
                 annotations=types.Annotations(audience=["user", "assistant"], priority=1.0),
             )
         )
+        if image:
+            images.append(image)
 
-    blocks.insert(0, types.TextContent(type="text", text=" · ".join(notes)))
-    return blocks
+    if notes:
+        blocks.insert(0, types.TextContent(type="text", text="\n".join(notes)))
+    elif not blocks:
+        # No ref carried a filename to build a URL from, and fetch_image is
+        # false -- content would otherwise be empty, indistinguishable from
+        # a silent failure to a client that never looks at structured_content.
+        blocks.append(types.TextContent(type="text", text=f"seed {used_seed}"))
+
+    return types.CallToolResult(
+        content=blocks,
+        structured_content={"workflow": workflow, "seed": used_seed, "images": images},
+    )
 
 
 def main() -> None:
